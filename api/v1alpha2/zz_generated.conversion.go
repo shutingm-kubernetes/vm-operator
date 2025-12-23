@@ -3048,6 +3048,7 @@ func autoConvert_v1alpha2_VirtualMachineNetworkSpec_To_v1alpha5_VirtualMachineNe
 	out.Nameservers = *(*[]string)(unsafe.Pointer(&in.Nameservers))
 	out.SearchDomains = *(*[]string)(unsafe.Pointer(&in.SearchDomains))
 	out.Interfaces = *(*[]v1alpha5.VirtualMachineNetworkInterfaceSpec)(unsafe.Pointer(&in.Interfaces))
+	out.VLANs = *(*map[string]v1alpha5.VirtualMachineNetworkVLANSpec)(unsafe.Pointer(&in.VLANs))
 	return nil
 }
 
@@ -3063,6 +3064,7 @@ func autoConvert_v1alpha5_VirtualMachineNetworkSpec_To_v1alpha2_VirtualMachineNe
 	out.Nameservers = *(*[]string)(unsafe.Pointer(&in.Nameservers))
 	out.SearchDomains = *(*[]string)(unsafe.Pointer(&in.SearchDomains))
 	out.Interfaces = *(*[]VirtualMachineNetworkInterfaceSpec)(unsafe.Pointer(&in.Interfaces))
+	out.VLANs = *(*map[string]VirtualMachineNetworkVLANSpec)(unsafe.Pointer(&in.VLANs))
 	return nil
 }
 

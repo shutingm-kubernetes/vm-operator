@@ -565,9 +565,13 @@ func guestNicInfoToInterfaceStatus(
 		DeviceKey: deviceKey,
 	}
 
-	if guestNicInfo.MacAddress != "" {
-		status.IP = &vmopv1.VirtualMachineNetworkInterfaceIPStatus{
-			MACAddr: guestNicInfo.MacAddress,
+	// Ensure we always have an IP status object if there's any network info
+	// This prevents nil pointer issues during serialization
+	if guestNicInfo.MacAddress != "" || guestNicInfo.IpConfig != nil {
+		status.IP = &vmopv1.VirtualMachineNetworkInterfaceIPStatus{}
+		
+		if guestNicInfo.MacAddress != "" {
+			status.IP.MACAddr = guestNicInfo.MacAddress
 		}
 	}
 
@@ -1011,6 +1015,16 @@ func UpdateNetworkStatusConfig(vm *vmopv1.VirtualMachine, args BootstrapArgs) {
 	}
 }
 
+func findMatchingVLANName(vlanSpecs map[string]vmopv1.VirtualMachineNetworkVLANSpec, parentName string, usedVLANs map[string]bool) string {
+	for vlanName, vlanSpec := range vlanSpecs {
+		if vlanSpec.Link == parentName && !usedVLANs[vlanName] {
+			usedVLANs[vlanName] = true
+			return vlanName
+		}
+	}
+	return ""
+}
+
 // updateGuestNetworkStatus updates the provided VM's status.network
 // field with information from the guestInfo.
 //
@@ -1056,9 +1070,16 @@ func updateGuestNetworkStatus(
 
 		if len(gi.Net) > 0 {
 			var ifaceSpecs []vmopv1.VirtualMachineNetworkInterfaceSpec
+			var vlanSpecs map[string]vmopv1.VirtualMachineNetworkVLANSpec
 			if vm.Spec.Network != nil {
 				ifaceSpecs = vm.Spec.Network.Interfaces
+				vlanSpecs = vm.Spec.Network.VLANs
 			}
+
+			// Track MAC addresses and their parent interface names to detect VLANs
+			macToParentName := make(map[string]string)
+			// Track which VLAN names have been used
+			usedVLANs := make(map[string]bool)
 
 			for i := range gi.Net {
 				deviceKey := gi.Net[i].DeviceConfigId
@@ -1071,6 +1092,31 @@ func updateGuestNetworkStatus(
 				var ifaceName string
 				if idx, ok := deviceKeyToSpecIdx[deviceKey]; ok && idx < len(ifaceSpecs) {
 					ifaceName = ifaceSpecs[idx].Name
+				}
+
+				// Handle VLAN interfaces: VLAN interfaces are created by the guest OS
+				// (via cloud-init/netplan) and share the same MAC address as their parent
+				// physical interface. When we encounter a duplicate MAC address, it indicates
+				// a VLAN interface that should be matched to a VLAN spec.
+				macAddr := gi.Net[i].MacAddress
+				if macAddr != "" && len(vlanSpecs) > 0 {
+					if parentName, exists := macToParentName[macAddr]; exists {
+						// Duplicate MAC detected - this is likely a VLAN interface.
+						// Match it to a VLAN spec that references the parent interface.
+						if vlanName := findMatchingVLANName(vlanSpecs, parentName, usedVLANs); vlanName != "" {
+							ifaceName = vlanName
+						}
+						// If no VLAN match found, skip this interface to avoid creating
+						// a status entry with an empty name that could cause serialization issues.
+						if ifaceName == "" {
+							continue
+						}
+					} else if ifaceName != "" {
+						// First occurrence of this MAC - record it as the parent interface.
+						// Subsequent interfaces with the same MAC will be treated as VLANs.
+						// Only record if we have a valid interface name.
+						macToParentName[macAddr] = ifaceName
+					}
 				}
 
 				ifaceStatuses = append(

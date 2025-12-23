@@ -25,6 +25,22 @@ type VirtualMachineNetworkRouteSpec struct {
 	Metric int32 `json:"metric,omitempty"`
 }
 
+// VirtualMachineNetworkVLANSpec describes a VLAN interface configuration.
+type VirtualMachineNetworkVLANSpec struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=4094
+
+	// ID is the VLAN ID, a number between 0 and 4094.
+	ID int64 `json:"id"`
+
+	// +kubebuilder:validation:Required
+
+	// Link is the name of the parent interface on which this VLAN is created.
+	// This must reference an interface name from the Interfaces list.
+	Link string `json:"link"`
+}
+
 // VirtualMachineNetworkInterfaceSpec describes the desired state of a VM's
 // network interface.
 type VirtualMachineNetworkInterfaceSpec struct {
@@ -244,6 +260,17 @@ type VirtualMachineNetworkSpec struct {
 	// +listMapKey=name
 	// +kubebuilder:validation:MaxItems=10
 	Interfaces []VirtualMachineNetworkInterfaceSpec `json:"interfaces,omitempty"`
+
+	// +optional
+
+	// VLANs is a map of VLAN interface configurations, keyed by a unique name.
+	// Each VLAN interface is a virtual interface on top of a parent interface with a
+	// VLAN ID. Each VLAN must reference a parent interface from the Interfaces
+	// list via the Link field.
+	//
+	// Please note this feature is available only with the following bootstrap
+	// providers: CloudInit.
+	VLANs map[string]VirtualMachineNetworkVLANSpec `json:"vlans,omitempty"`
 }
 
 // VirtualMachineNetworkDNSStatus describes the observed state of the guest's

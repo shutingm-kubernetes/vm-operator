@@ -20,7 +20,7 @@ else # (,$(strip $(shell command -v go 2>/dev/null || true)))
 export GO111MODULE := on
 
 # Get the information about the platform on which the tools are built/run.
-GOHOSTOS := $(shell go env GOHOSTOS)
+GOHOSTOS := linux
 GOHOSTARCH := $(shell go env GOHOSTARCH)
 GOHOSTOSARCH := $(GOHOSTOS)_$(GOHOSTARCH)
 

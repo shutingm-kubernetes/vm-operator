@@ -98,6 +98,19 @@ func NetPlanCustomization(result NetworkInterfaceResults) (*netplan.Network, err
 		netPlan.Ethernets[r.Name] = npEth
 	}
 
+	// Add VLANs
+	if len(result.VLANs) > 0 {
+		netPlan.Vlans = make(map[string]netplan.VLAN)
+		for vlanName, vlan := range result.VLANs {
+			npVlan := netplan.VLAN{
+				ID:   ptr.To(vlan.ID),
+				Link: ptr.To(vlan.Link),
+			}
+
+			netPlan.Vlans[vlanName] = npVlan
+		}
+	}
+
 	return netPlan, nil
 }
 

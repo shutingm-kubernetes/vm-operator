@@ -601,6 +601,74 @@ var _ = Describe("UpdateStatus", func() {
 					Expect(network.Interfaces[1].IP.MACAddr).To(Equal("mac-4001"))
 				})
 			})
+
+			Context("VM has VLAN interfaces with duplicate MAC addresses", func() {
+				BeforeEach(func() {
+					vmCtx.MoVM.Guest = &vimtypes.GuestInfo{
+						Net: []vimtypes.GuestNicInfo{
+							{
+								DeviceConfigId: 4000,
+								MacAddress:     "mac-4000",
+							},
+							{
+								DeviceConfigId: 4001,
+								MacAddress:     "mac-4001",
+							},
+							{
+								DeviceConfigId: 4001,
+								MacAddress:     "mac-4001", // Same MAC as parent
+							},
+							{
+								DeviceConfigId: 4001,
+								MacAddress:     "mac-4001", // Same MAC as parent
+							},
+						},
+					}
+
+					vmCtx.VM.Spec.Network = &vmopv1.VirtualMachineNetworkSpec{
+						Interfaces: []vmopv1.VirtualMachineNetworkInterfaceSpec{
+							{
+								Name: "eth0",
+							},
+							{
+								Name: "eth1",
+							},
+						},
+						VLANs: map[string]vmopv1.VirtualMachineNetworkVLANSpec{
+							"vlan100": {
+								Link: "eth1",
+								ID:   100,
+							},
+							"vlan200": {
+								Link: "eth1",
+								ID:   200,
+							},
+						},
+					}
+
+					data.NetworkDeviceKeysToSpecIdx[4001] = 1
+				})
+
+				It("Assigns VLAN names to duplicate MAC interfaces", func() {
+					network := vmCtx.VM.Status.Network
+					Expect(network).ToNot(BeNil())
+
+					Expect(network.Interfaces).To(HaveLen(4))
+
+					// First interface should be the parent
+					Expect(network.Interfaces[1].Name).To(Equal("eth1"))
+					Expect(network.Interfaces[1].IP).ToNot(BeNil())
+					Expect(network.Interfaces[1].IP.MACAddr).To(Equal("mac-4001"))
+
+					// Second and third interfaces should be VLANs
+					vlanNames := []string{network.Interfaces[2].Name, network.Interfaces[3].Name}
+					Expect(vlanNames).To(ContainElements("vlan100", "vlan200"))
+					Expect(network.Interfaces[2].IP).ToNot(BeNil())
+					Expect(network.Interfaces[2].IP.MACAddr).To(Equal("mac-4001"))
+					Expect(network.Interfaces[3].IP).ToNot(BeNil())
+					Expect(network.Interfaces[3].IP.MACAddr).To(Equal("mac-4001"))
+				})
+			})
 		})
 
 		Context("DNS", func() {

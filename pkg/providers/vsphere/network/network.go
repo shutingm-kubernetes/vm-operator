@@ -43,6 +43,7 @@ import (
 
 type NetworkInterfaceResults struct {
 	Results                   []NetworkInterfaceResult
+	VLANs                     map[string]NetworkVLANResult
 	UpdatedEthCards           bool
 	OrphanedNetworkInterfaces []ctrlclient.Object
 }
@@ -80,6 +81,11 @@ type NetworkInterfaceRoute struct {
 	To     string
 	Via    string
 	Metric int32
+}
+
+type NetworkVLANResult struct {
+	ID   int64
+	Link string
 }
 
 const (
@@ -178,8 +184,22 @@ func CreateAndWaitForNetworkInterfaces(
 		results = append(results, *result)
 	}
 
+	// Process VLANs
+	vlans := make(map[string]NetworkVLANResult)
+	if len(networkSpec.VLANs) > 0 {
+		for vlanName, vlanSpec := range networkSpec.VLANs {
+			vlanResult := NetworkVLANResult{
+				ID:   vlanSpec.ID,
+				Link: vlanSpec.Link,
+			}
+
+			vlans[vlanName] = vlanResult
+		}
+	}
+
 	return NetworkInterfaceResults{
 		Results: results,
+		VLANs:   vlans,
 	}, nil
 }
 

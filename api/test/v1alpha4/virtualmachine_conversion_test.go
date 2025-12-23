@@ -654,5 +654,88 @@ func TestVirtualMachineConversion(t *testing.T) {
 				hubSpokeHub(g, &hub, &vmopv1.VirtualMachine{}, &vmopv1a4.VirtualMachine{})
 			})
 		})
+
+		t.Run("VirtualMachine hub-spoke-hub with VLANs", func(t *testing.T) {
+			g := NewWithT(t)
+
+			// Create a hub VM with VLANs configuration
+			hub := vmopv1.VirtualMachine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vm-with-vlans",
+					Namespace: "default",
+				},
+				Spec: vmopv1.VirtualMachineSpec{
+					ImageName: "ubuntu-2004",
+					ClassName: "best-effort-small",
+					Network: &vmopv1.VirtualMachineNetworkSpec{
+						Interfaces: []vmopv1.VirtualMachineNetworkInterfaceSpec{
+							{
+								Name: "eth0",
+							},
+							{
+								Name: "eth1",
+							},
+							{
+								Name: "eth2",
+							},
+						},
+						VLANs: map[string]vmopv1.VirtualMachineNetworkVLANSpec{
+							"vlan100": {
+								ID:   100,
+								Link: "eth1",
+							},
+							"vlan200": {
+								ID:   200,
+								Link: "eth1",
+							},
+							"vlan300": {
+								ID:   300,
+								Link: "eth2",
+							},
+						},
+					},
+				},
+			}
+
+			// Convert hub -> spoke
+			var spoke vmopv1a4.VirtualMachine
+			g.Expect(spoke.ConvertFrom(&hub)).To(Succeed())
+
+			// Verify hub
+			g.Expect(spoke.Spec.Network).ToNot(BeNil())
+			g.Expect(spoke.Spec.Network.VLANs).To(HaveLen(3))
+			g.Expect(spoke.Spec.Network.VLANs).To(HaveKey("vlan100"))
+			g.Expect(spoke.Spec.Network.VLANs).To(HaveKey("vlan200"))
+			g.Expect(spoke.Spec.Network.VLANs).To(HaveKey("vlan300"))
+
+			g.Expect(spoke.Spec.Network.VLANs["vlan100"].ID).To(Equal(int64(100)))
+			g.Expect(spoke.Spec.Network.VLANs["vlan100"].Link).To(Equal("eth1"))
+			g.Expect(spoke.Spec.Network.VLANs["vlan200"].ID).To(Equal(int64(200)))
+			g.Expect(spoke.Spec.Network.VLANs["vlan200"].Link).To(Equal("eth1"))
+			g.Expect(spoke.Spec.Network.VLANs["vlan300"].ID).To(Equal(int64(300)))
+			g.Expect(spoke.Spec.Network.VLANs["vlan300"].Link).To(Equal("eth2"))
+
+			// Convert spoke -> hub
+			var hubAfter vmopv1.VirtualMachine
+			g.Expect(spoke.ConvertTo(&hubAfter)).To(Succeed())
+
+			// Verify hub
+			g.Expect(hubAfter.Spec.Network).ToNot(BeNil())
+			g.Expect(hubAfter.Spec.Network.VLANs).To(HaveLen(3))
+			g.Expect(hubAfter.Spec.Network.VLANs).To(HaveKey("vlan100"))
+			g.Expect(hubAfter.Spec.Network.VLANs).To(HaveKey("vlan200"))
+			g.Expect(hubAfter.Spec.Network.VLANs).To(HaveKey("vlan300"))
+
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan100"].ID).To(Equal(int64(100)))
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan100"].Link).To(Equal("eth1"))
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan200"].ID).To(Equal(int64(200)))
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan200"].Link).To(Equal("eth1"))
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan300"].ID).To(Equal(int64(300)))
+			g.Expect(hubAfter.Spec.Network.VLANs["vlan300"].Link).To(Equal("eth2"))
+
+			// Verify full round-trip equality
+			g.Expect(apiequality.Semantic.DeepEqual(hub.Spec.Network.VLANs, hubAfter.Spec.Network.VLANs)).To(BeTrue(),
+				cmp.Diff(hub.Spec.Network.VLANs, hubAfter.Spec.Network.VLANs))
+		})
 	})
 }
