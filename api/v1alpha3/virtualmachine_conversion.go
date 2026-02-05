@@ -116,6 +116,12 @@ func Convert_v1alpha5_VirtualMachineCdromSpec_To_v1alpha3_VirtualMachineCdromSpe
 	return autoConvert_v1alpha5_VirtualMachineCdromSpec_To_v1alpha3_VirtualMachineCdromSpec(in, out, s)
 }
 
+func Convert_v1alpha5_VirtualMachineNetworkSpec_To_v1alpha3_VirtualMachineNetworkSpec(
+	in *vmopv1.VirtualMachineNetworkSpec, out *VirtualMachineNetworkSpec, s apiconversion.Scope) error {
+
+	return autoConvert_v1alpha5_VirtualMachineNetworkSpec_To_v1alpha3_VirtualMachineNetworkSpec(in, out, s)
+}
+
 func Convert_v1alpha5_VirtualMachineBootstrapCloudInitSpec_To_v1alpha3_VirtualMachineBootstrapCloudInitSpec(
 	in *vmopv1.VirtualMachineBootstrapCloudInitSpec, out *VirtualMachineBootstrapCloudInitSpec, s apiconversion.Scope) error {
 
@@ -343,6 +349,17 @@ func restore_v1alpha5_VirtualMachineAffinity(dst, src *vmopv1.VirtualMachine) {
 	}
 }
 
+func restore_v1alpha5_VirtualMachineNetworkVLANs(dst, src *vmopv1.VirtualMachine) {
+	if src.Spec.Network == nil || len(src.Spec.Network.VLANs) == 0 {
+		return
+	}
+
+	if dst.Spec.Network == nil {
+		dst.Spec.Network = &vmopv1.VirtualMachineNetworkSpec{}
+	}
+	dst.Spec.Network.VLANs = src.Spec.Network.VLANs
+}
+
 // ConvertTo converts this VirtualMachine to the Hub version.
 func (src *VirtualMachine) ConvertTo(dstRaw ctrlconversion.Hub) error {
 	dst := dstRaw.(*vmopv1.VirtualMachine)
@@ -369,6 +386,7 @@ func (src *VirtualMachine) ConvertTo(dstRaw ctrlconversion.Hub) error {
 	restore_v1alpha5_VirtualMachineCryptoVTPM(dst, restored)
 	restore_v1alpha5_VirtualMachineAffinity(dst, restored)
 	restore_v1alpha5_VirtualMachineCryptoVTPM(dst, restored)
+	restore_v1alpha5_VirtualMachineNetworkVLANs(dst, restored)
 
 	// END RESTORE
 
